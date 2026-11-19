@@ -1,0 +1,257 @@
+openapi: 3.0.0
+info:
+  title: Information Exchange Service
+  description: API для обмена информацией об угрозах.
+  version: 1.1.0
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /info/{md5}:
+    get:
+      summary: Получить информацию об угрозе по MD5
+      description: Возвращает полную информацию об угрозе для указанного MD5-хеша. Доступно ключам с правами read и write.
+      operationId: getInfoByMd5
+      parameters:
+        - $ref: '#/components/parameters/Md5'
+      responses:
+        '200':
+          description: Успешный ответ с информацией об угрозе
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreatResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    put:
+      summary: Обновить информацию об угрозе по MD5
+      description: Полностью заменяет информацию о существующей угрозе. Требует ключ с правами write.
+      operationId: updateThreat
+      parameters:
+        - $ref: '#/components/parameters/Md5'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThreatUpdateRequest'
+      responses:
+        '200':
+          description: Информация успешно обновлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreatResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /info:
+    post:
+      summary: Создать новую запись об угрозе
+      description: Добавляет новую информацию об угрозе. MD5 должен быть уникальным. Требует ключ с правами write.
+      operationId: createThreat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThreatCreateRequest'
+      responses:
+        '201':
+          description: Запись успешно создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreatResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Угроза с таким MD5 уже существует
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  parameters:
+    Md5:
+      name: md5
+      in: path
+      required: true
+      description: MD5-хеш файла (32 символа, шестнадцатеричные цифры, регистр не важен)
+      schema:
+        type: string
+        pattern: '^[a-fA-F0-9]{32}$'
+        example: "d41d8cd98f00b204e9800998ecf8427e"
+
+  responses:
+    BadRequest:
+      description: Некорректные данные запроса или MD5
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: API-ключ не передан или неверен
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: У ключа нет прав на эту операцию
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Угроза с указанным MD5 не найдена
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: Превышен лимит запросов, повторите позже (см. заголовок Retry-After)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: Внутренняя ошибка сервера
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    Severity:
+      type: string
+      description: Уровень опасности угрозы
+      enum: [low, medium, high, critical]
+      example: high
+
+    ThreatCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - md5
+        - name
+        - severity
+      properties:
+        md5:
+          type: string
+          pattern: '^[a-fA-F0-9]{32}$'
+          description: MD5-хеш файла (32 шестнадцатеричных символа)
+          example: "d41d8cd98f00b204e9800998ecf8427e"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Название угрозы
+          example: "Trojan.Win32.Generic"
+        severity:
+          $ref: '#/components/schemas/Severity'
+        description:
+          type: string
+          maxLength: 2000
+          description: Описание угрозы
+          example: "Загрузчик, скачивающий дополнительные модули"
+
+    ThreatUpdateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - severity
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Название угрозы
+          example: "Trojan.Win32.Generic"
+        severity:
+          $ref: '#/components/schemas/Severity'
+        description:
+          type: string
+          maxLength: 2000
+          description: Описание угрозы
+
+    ThreatResponse:
+      type: object
+      required:
+        - md5
+        - name
+        - severity
+        - created_at
+        - updated_at
+      properties:
+        md5:
+          type: string
+          pattern: '^[a-f0-9]{32}$'
+          description: MD5-хеш в нижнем регистре
+          example: "d41d8cd98f00b204e9800998ecf8427e"
+        name:
+          type: string
+          description: Название угрозы
+          example: "Trojan.Win32.Generic"
+        severity:
+          $ref: '#/components/schemas/Severity'
+        description:
+          type: string
+          description: Описание угрозы
+        created_at:
+          type: string
+          format: date-time
+          description: Время создания записи (UTC)
+        updated_at:
+          type: string
+          format: date-time
+          description: Время последнего изменения записи (UTC)
+
+    ErrorResponse:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: Человекочитаемое описание ошибки
+          example: "Threat not found"
+        details:
+          type: string
+          description: Дополнительная информация
+          example: "No threat with MD5 d41d8cd98f00b204e9800998ecf8427e found"

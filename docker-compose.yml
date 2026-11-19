@@ -1,0 +1,36 @@
+name: threat-service
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: threats
+      POSTGRES_PASSWORD: threats
+      POSTGRES_DB: threats
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U threats -d threats"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://threats:threats@db:5432/threats?sslmode=disable
+      API_KEYS: ${API_KEYS:-dev-write-key}
+      READ_API_KEYS: ${READ_API_KEYS:-dev-read-key}
+      RATE_LIMIT_RPS: ${RATE_LIMIT_RPS:-10}
+      RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-20}
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
